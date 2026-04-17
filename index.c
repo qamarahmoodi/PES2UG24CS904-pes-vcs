@@ -16,6 +16,7 @@
 // TODO functions:     index_load, index_save, index_add
 
 #include "index.h"
+#include "object.h"   // student: needed for object_write
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
