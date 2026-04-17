@@ -237,10 +237,20 @@ int index_add(Index *index, const char *path) {
     size_t size = ftell(f);
     rewind(f);
 
-    // student: read file content
+    // student: allocate buffer safely
     char *buffer = malloc(size);
-    fread(buffer, 1, size, f);
-    fclose(f);
+    if (!buffer) {
+        fclose(f);
+        return -1;
+    }
+
+    // student: read file safely
+    size_t read_bytes = fread(buffer, 1, size, f);
+    if (read_bytes != size) {
+        free(buffer);
+        fclose(f);
+        return -1;
+    }
 
     // student: write blob object
     ObjectID id;
@@ -264,7 +274,11 @@ int index_add(Index *index, const char *path) {
     }
 
     // student: fill entry
-    e->mode = st.st_mode;
+    // student: set proper mode (file or exec)
+    if (st.st_mode & S_IXUSR)
+        e->mode = 0100755;
+    else
+    e->mode = 0100644;
     e->hash = id;
     e->mtime_sec = st.st_mtime;
     e->size = st.st_size;
