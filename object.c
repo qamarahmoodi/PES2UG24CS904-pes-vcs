@@ -94,9 +94,58 @@ int object_exists(const ObjectID *id) {
 //
 // Returns 0 on success, -1 on error.
 int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out) {
-    // TODO: Implement
-    (void)type; (void)data; (void)len; (void)id_out;
-    return -1;
+    // student: decide type string
+    const char *type_str;
+    if (type == OBJ_BLOB) type_str = "blob";
+    else if (type == OBJ_TREE) type_str = "tree";
+    else type_str = "commit";
+
+    // student: create header "type size"
+    char header[64];
+    int header_len = sprintf(header, "%s %zu", type_str, len) + 1;
+
+    // student: allocate full object (header + data)
+    size_t total_len = header_len + len;
+    char *full = malloc(total_len);
+
+    memcpy(full, header, header_len);
+    memcpy(full + header_len, data, len);
+
+    // student: compute hash of FULL object
+    compute_hash(full, total_len, id_out);
+
+    // student: check if object already exists
+    if (object_exists(id_out)) {
+        free(full);
+        return 0;
+    }
+
+    // student: get final path
+    char path[512];
+    object_path(id_out, path, sizeof(path));
+
+    // student: create directory (.pes/objects/XX)
+    char dir[512];
+    strcpy(dir, path);
+    char *slash = strrchr(dir, '/');
+    *slash = '\0';
+    mkdir(dir, 0755);
+
+    // student: temp file path
+    char tmp[512];
+    sprintf(tmp, "%s.tmp", path);
+
+    // student: write file
+    int fd = open(tmp, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    write(fd, full, total_len);
+    fsync(fd);
+    close(fd);
+
+    // student: rename to final file
+    rename(tmp, path);
+
+    free(full);
+    return 0;
 }
 
 // Read an object from the store.
@@ -122,7 +171,49 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
 // The caller is responsible for calling free(*data_out).
 // Returns 0 on success, -1 on error (file not found, corrupt, etc.).
 int object_read(const ObjectID *id, ObjectType *type_out, void **data_out, size_t *len_out) {
-    // TODO: Implement
-    (void)id; (void)type_out; (void)data_out; (void)len_out;
-    return -1;
+    // student: get object path
+    char path[512];
+    object_path(id, path, sizeof(path));
+
+    FILE *f = fopen(path, "rb");
+    if (!f) return -1;
+
+    // student: read full file
+    fseek(f, 0, SEEK_END);
+    size_t size = ftell(f);
+    rewind(f);
+
+    char *buffer = malloc(size);
+    fread(buffer, 1, size, f);
+    fclose(f);
+
+    // student: verify integrity
+    ObjectID check;
+    compute_hash(buffer, size, &check);
+    if (memcmp(check.hash, id->hash, HASH_SIZE) != 0) {
+        free(buffer);
+        return -1;
+    }
+
+    // student: find '\0' separating header and data
+    char *null_pos = memchr(buffer, '\0', size);
+    if (!null_pos) {
+        free(buffer);
+        return -1;
+    }
+
+    // student: determine type
+    if (strncmp(buffer, "blob", 4) == 0) *type_out = OBJ_BLOB;
+    else if (strncmp(buffer, "tree", 4) == 0) *type_out = OBJ_TREE;
+    else *type_out = OBJ_COMMIT;
+
+    size_t header_len = (null_pos - buffer) + 1;
+
+    // student: extract data
+    *len_out = size - header_len;
+    *data_out = malloc(*len_out);
+    memcpy(*data_out, buffer + header_len, *len_out);
+
+    free(buffer);
+    return 0;
 }
