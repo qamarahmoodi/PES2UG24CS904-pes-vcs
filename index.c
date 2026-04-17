@@ -16,7 +16,6 @@
 // TODO functions:     index_load, index_save, index_add
 
 #include "index.h"
-#include "object.h"   // student: needed for object_write
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,6 +23,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <dirent.h>
+
+// student: forward declaration for object_write
+int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out);
 
 // ─── PROVIDED ────────────────────────────────────────────────────────────────
 
