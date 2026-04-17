@@ -225,8 +225,51 @@ int index_save(const Index *index) {
 //
 // Returns 0 on success, -1 on error.
 int index_add(Index *index, const char *path) {
-    // TODO: Implement file staging
-    // (See Lab Appendix for logical steps)
-    (void)index; (void)path;
-    return -1;
+    // student: open file
+    FILE *f = fopen(path, "rb");
+    if (!f) {
+        fprintf(stderr, "error: failed to add '%s'\n", path);
+        return -1;
+    }
+
+    // student: get file size
+    fseek(f, 0, SEEK_END);
+    size_t size = ftell(f);
+    rewind(f);
+
+    // student: read file content
+    char *buffer = malloc(size);
+    fread(buffer, 1, size, f);
+    fclose(f);
+
+    // student: write blob object
+    ObjectID id;
+    if (object_write(OBJ_BLOB, buffer, size, &id) != 0) {
+        free(buffer);
+        return -1;
+    }
+
+    free(buffer);
+
+    // student: get file metadata
+    struct stat st;
+    if (stat(path, &st) != 0) return -1;
+
+    // student: check if already exists in index
+    IndexEntry *e = index_find(index, path);
+
+    if (!e) {
+        // student: create new entry
+        e = &index->entries[index->count++];
+    }
+
+    // student: fill entry
+    e->mode = st.st_mode;
+    e->hash = id;
+    e->mtime_sec = st.st_mtime;
+    e->size = st.st_size;
+    strcpy(e->path, path);
+
+    // student: save index
+    return index_save(index);
 }
